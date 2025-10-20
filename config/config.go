@@ -2,8 +2,11 @@ package config
 
 import (
 	"flyinghero/nes"
+	"log"
 	"os"
 	"time"
+
+	"github.com/joho/godotenv"
 )
 
 type Config struct {
@@ -13,6 +16,10 @@ type Config struct {
 }
 
 func Load() *Config {
+	if err := godotenv.Load(); err != nil {
+		log.Printf("Файл .env не найден, используем переменные окружения: %v", err)
+	}
+
 	nesKeys := nes.GetNESKeys()
 
 	return &Config{

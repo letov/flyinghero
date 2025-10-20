@@ -1,7 +1,6 @@
 package game
 
 import (
-	"context"
 	"log"
 	"time"
 
@@ -51,9 +50,6 @@ func (g *Game) runGameLoop() {
 			if err := g.browser.PressKeys(nesKeys); err != nil {
 				log.Printf("Ошибка нажатия клавиш: %v", err)
 			}
-		case <-context.Background().Done():
-			log.Println("Завершение работы...")
-			return
 		}
 	}
 }
