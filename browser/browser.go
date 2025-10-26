@@ -3,18 +3,13 @@ package browser
 import (
 	"context"
 	"log"
-	"os"
-	"os/exec"
-	"runtime"
 	"time"
 
 	"github.com/chromedp/chromedp"
 )
 
 type Browser struct {
-	ctx            context.Context
-	lastScreenshot string
-	viewerProcess  *exec.Cmd
+	ctx context.Context
 }
 
 func NewBrowser() *Browser {
@@ -25,13 +20,15 @@ func NewBrowser() *Browser {
 		chromedp.Flag("disable-extensions", true),
 		chromedp.Flag("no-sandbox", true),
 		chromedp.Flag("start-fullscreen", true),
-		chromedp.Flag("kiosk", true),
+		chromedp.Flag("auto-open-devtools-for-tabs", true),
+		chromedp.Flag("devtools", true),
+		chromedp.Flag("remote-debugging-port", "9222"),
 	)
 
 	allocCtx, _ := chromedp.NewExecAllocator(context.Background(), opts...)
 	ctx, _ := chromedp.NewContext(allocCtx, chromedp.WithLogf(log.Printf))
 
-	return &Browser{ctx: ctx, lastScreenshot: "", viewerProcess: nil}
+	return &Browser{ctx: ctx}
 }
 
 func (b *Browser) OpenURL(url string) error {
@@ -51,66 +48,53 @@ func (b *Browser) OpenURL(url string) error {
 	return nil
 }
 
-func (b *Browser) TakeScreenshot() error {
-	var buf []byte
-
-	err := chromedp.Run(b.ctx,
-		chromedp.CaptureScreenshot(&buf),
-	)
-
-	if err != nil {
-		return err
-	}
-
-	if err := os.MkdirAll("screenshots", 0755); err != nil {
-		return err
-	}
-
-	filename := "screenshots/current.png"
-
-	if err := os.WriteFile(filename, buf, 0644); err != nil {
-		return err
-	}
-
-	b.lastScreenshot = filename
-	log.Printf("Скриншот обновлен: %s", filename)
-
-	b.openScreenshot(filename)
-	return nil
+func (b *Browser) LogToBrowser(message string) {
+	log.Printf(message)
+	jsCode := `console.log("` + message + `");`
+	chromedp.Run(b.ctx, chromedp.Evaluate(jsCode, nil))
 }
 
-func (b *Browser) PressKeys(keys []string) error {
+func (b *Browser) PressKeysToElement(keys []string, selector string) error {
 	for _, key := range keys {
-		log.Printf("Нажимаем клавишу: %s", key)
+		keyCode := b.getKeyCode(key)
 
-		err := chromedp.Run(b.ctx,
-			chromedp.KeyEvent(key),
-		)
+		jsCode := `
+			document.querySelector("` + selector + `").dispatchEvent(new KeyboardEvent('keydown',{key:'` + key + `',keyCode:` + keyCode + `,bubbles:true}));setTimeout(()=>document.querySelector("` + selector + `").dispatchEvent(new KeyboardEvent('keyup',{key:'` + key + `',keyCode:` + keyCode + `,bubbles:true})),50);
+		`
 
+		err := chromedp.Run(b.ctx, chromedp.Evaluate(jsCode, nil))
 		if err != nil {
-			return err
+			b.LogToBrowser("Ошибка отправки клавиши " + key + ": " + err.Error())
 		}
 
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 	}
 
 	return nil
 }
 
-func (b *Browser) openScreenshot(filename string) {
-	if b.viewerProcess == nil && runtime.GOOS == "darwin" {
-		b.viewerProcess = exec.Command("open", "-W", filename)
-		go b.viewerProcess.Run()
+func (b *Browser) getKeyCode(key string) string {
+	keyCodeMap := map[string]string{
+		"ArrowUp":    "38",
+		"ArrowDown":  "40",
+		"ArrowLeft":  "37",
+		"ArrowRight": "39",
+		"Enter":      "13",
+		"Space":      "32",
+		"KeyZ":       "90",
+		"KeyX":       "88",
 	}
+
+	if code, exists := keyCodeMap[key]; exists {
+		return code
+	}
+	return "0"
 }
 
-func (b *Browser) GetLastScreenshot() string {
-	return b.lastScreenshot
+func (b *Browser) GetContext() context.Context {
+	return b.ctx
 }
 
 func (b *Browser) Close() {
-	if b.viewerProcess != nil {
-		b.viewerProcess.Process.Kill()
-	}
 	chromedp.Cancel(b.ctx)
 }

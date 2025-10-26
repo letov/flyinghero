@@ -6,6 +6,7 @@ import (
 
 	"flyinghero/browser"
 	"flyinghero/config"
+	"flyinghero/gameinit"
 )
 
 type Game struct {
@@ -20,11 +21,22 @@ func NewGame(browser *browser.Browser, config *config.Config) *Game {
 	}
 }
 
-func (g *Game) Start() error {
+func (g *Game) Start(gameInit *gameinit.GameInit) error {
 	if err := g.browser.OpenURL(g.config.URL); err != nil {
 		return err
 	}
 
+	ctx := g.browser.GetContext()
+
+	if err := gameInit.Init(ctx, g.config.GameElement); err != nil {
+		log.Printf("Ошибка инициализации игры: %v", err)
+	}
+
+	for !gameInit.WaitUntil(ctx) {
+		log.Println("Ожидаем завершения инициализации...")
+	}
+
+	log.Println("Инициализация завершена, запускаем игровой цикл")
 	g.runGameLoop()
 	return nil
 }
@@ -42,13 +54,9 @@ func (g *Game) runGameLoop() {
 	for {
 		select {
 		case <-ticker.C:
-			if err := g.browser.TakeScreenshot(); err != nil {
-				log.Printf("Ошибка создания скриншота: %v", err)
-			}
-
 			nesKeys := g.config.NESKeys.GetMovementKeys()
-			if err := g.browser.PressKeys(nesKeys); err != nil {
-				log.Printf("Ошибка нажатия клавиш: %v", err)
+			if err := g.browser.PressKeysToElement(nesKeys, g.config.GameElement); err != nil {
+				log.Printf("Ошибка нажатия клавиш движения: %v", err)
 			}
 		}
 	}

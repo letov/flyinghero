@@ -10,9 +10,10 @@ import (
 )
 
 type Config struct {
-	URL      string
-	Interval time.Duration
-	NESKeys  *nes.NESKeys
+	URL         string
+	Interval    time.Duration
+	NESKeys     *nes.NESKeys
+	GameElement string
 }
 
 func Load() *Config {
@@ -23,9 +24,10 @@ func Load() *Config {
 	nesKeys := nes.GetNESKeys()
 
 	return &Config{
-		URL:      getEnv("GAME_URL", "https://example.com"),
-		Interval: getDurationFromEnv("INTERVAL", 5*time.Second),
-		NESKeys:  nesKeys,
+		URL:         getEnv("GAME_URL", "https://example.com"),
+		Interval:    getDurationFromEnv("INTERVAL", 5*time.Second),
+		NESKeys:     nesKeys,
+		GameElement: getEnv("GAME_ELEMENT", "#nesroot"),
 	}
 }
 
