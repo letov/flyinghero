@@ -3,6 +3,7 @@ package browser
 import (
 	"context"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/chromedp/chromedp"
@@ -16,13 +17,12 @@ func NewBrowser() *Browser {
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("headless", false),
 		chromedp.Flag("disable-gpu", false),
-		chromedp.Flag("disable-dev-shm-usage", true),
 		chromedp.Flag("disable-extensions", true),
-		chromedp.Flag("no-sandbox", true),
 		chromedp.Flag("start-fullscreen", true),
 		chromedp.Flag("auto-open-devtools-for-tabs", true),
-		chromedp.Flag("devtools", true),
-		chromedp.Flag("remote-debugging-port", "9222"),
+		chromedp.Flag("enable-logging", true),
+		chromedp.Flag("log-level", "0"),
+		chromedp.Flag("v", "1"),
 	)
 
 	allocCtx, _ := chromedp.NewExecAllocator(context.Background(), opts...)
@@ -50,13 +50,16 @@ func (b *Browser) OpenURL(url string) error {
 
 func (b *Browser) LogToBrowser(message string) {
 	log.Printf(message)
-	jsCode := `console.log("` + message + `");`
+	escapedMessage := strings.ReplaceAll(message, `"`, `\"`)
+	jsCode := `console.log("` + escapedMessage + `");`
 	chromedp.Run(b.ctx, chromedp.Evaluate(jsCode, nil))
 }
 
 func (b *Browser) PressKeysToElement(keys []string, selector string) error {
 	for _, key := range keys {
 		keyCode := b.getKeyCode(key)
+
+		b.LogToBrowser("Нажатие клавиши: " + key)
 
 		jsCode := `
 			document.querySelector("` + selector + `").dispatchEvent(new KeyboardEvent('keydown',{key:'` + key + `',keyCode:` + keyCode + `,bubbles:true}));setTimeout(()=>document.querySelector("` + selector + `").dispatchEvent(new KeyboardEvent('keyup',{key:'` + key + `',keyCode:` + keyCode + `,bubbles:true})),50);

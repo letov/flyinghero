@@ -37,6 +37,7 @@ func (g *Game) Start(gameInit *gameinit.GameInit) error {
 	}
 
 	log.Println("Инициализация завершена, запускаем игровой цикл")
+
 	g.runGameLoop()
 	return nil
 }
